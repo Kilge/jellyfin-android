@@ -64,6 +64,7 @@ class ActivityEventHandler(
             is ActivityEvent.LaunchNativePlayer -> {
                 val args = Bundle().apply {
                     putParcelable(Constants.EXTRA_MEDIA_PLAY_OPTIONS, event.playOptions)
+                    putParcelable(Constants.EXTRA_WEB_PREFERENCES, event.preferences)
                 }
                 // Drop any previous player (fragment + its back stack entry):
                 // stacking players left multiple ExoPlayer/MediaSession instances
