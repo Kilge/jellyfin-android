@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand and base colors (dark theme) -->
+    <color name="jellyfin_primary">#202020</color>
+    <color name="jellyfin_primary_dark">#101010</color>
+
+    <!-- App colors -->
+    <color name="theme_background">#101010</color>
+    <!-- 87% white, matching the web skinHeader icon/text color in dark mode -->
+    <color name="settings_header_icon">#DEFFFFFF</color>
+</resources>
