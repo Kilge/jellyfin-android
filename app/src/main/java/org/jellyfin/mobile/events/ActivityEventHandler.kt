@@ -5,7 +5,8 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.core.net.toUri
-import androidx.fragment.app.replace
+import androidx.fragment.app.FragmentManager
+import androidx.fragment.app.add
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -64,14 +65,19 @@ class ActivityEventHandler(
                 val args = Bundle().apply {
                     putParcelable(Constants.EXTRA_MEDIA_PLAY_OPTIONS, event.playOptions)
                 }
-                // Replace (not add) the fragment in the container: adding a new
-                // PlayerFragment every time stacked multiple ExoPlayer/MediaSession
-                // instances that fought over media button routing (Bluetooth
-                // remote bug). Replacing also destroys the web WebViewFragment,
-                // releasing its always-present MediaSession.
+                // Drop any previous player (fragment + its back stack entry):
+                // stacking players left multiple ExoPlayer/MediaSession instances
+                // fighting over media button routing (Bluetooth remote bug).
+                // Keep `add` (not `replace`) so the WebViewFragment underneath is
+                // preserved - replacing it made back re-create the WebView and
+                // reload the home page.
+                supportFragmentManager.popBackStack(
+                    PLAYER_BACK_STACK_TAG,
+                    FragmentManager.POP_BACK_STACK_INCLUSIVE,
+                )
                 supportFragmentManager.beginTransaction()
-                    .replace<PlayerFragment>(R.id.fragment_container, args = args)
-                    .addToBackStack(null)
+                    .add<PlayerFragment>(R.id.fragment_container, args = args)
+                    .addToBackStack(PLAYER_BACK_STACK_TAG)
                     .commit()
             }
             is ActivityEvent.OpenUrl -> {
@@ -128,5 +134,10 @@ class ActivityEventHandler(
 
     fun emit(event: ActivityEvent) {
         eventsFlow.tryEmit(event)
+    }
+
+    private companion object {
+        /** Back stack tag used to identify (and replace) the native player. */
+        const val PLAYER_BACK_STACK_TAG = "org.jellyfin.mobile.player"
     }
 }
