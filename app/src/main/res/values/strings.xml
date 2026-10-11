@@ -89,6 +89,10 @@
     <string name="external_player_unknown_error">Unknown error in external player. Playback tracking disabled.</string>
 
     <string name="activity_name_settings">Jellyfin Settings</string>
+    <string name="pref_category_appearance">Appearance</string>
+    <string name="pref_follow_system_theme">Follow system theme</string>
+    <string name="pref_follow_system_theme_summary_off">The web interface keeps its own theme setting</string>
+    <string name="pref_follow_system_theme_summary_on">The web interface follows the system dark / light mode</string>
     <string name="pref_category_music_player">Music player</string>
     <string name="pref_music_notification_always_dismissible_title">Dismissible player notification</string>
     <string name="pref_music_notification_always_dismissible_summary_off">The notification can only be dismissed when playback is paused</string>

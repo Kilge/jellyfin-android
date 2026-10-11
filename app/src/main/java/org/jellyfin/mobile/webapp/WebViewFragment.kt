@@ -74,6 +74,9 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
     private lateinit var externalPlayer: ExternalPlayer
     private val mediaSegments: MediaSegments by inject()
 
+    /** Last applied value of the "Follow system theme" switch, to detect changes. */
+    private var appliedFollowSystemTheme: Boolean? = null
+
     lateinit var server: ServerEntity
         private set
     private var connected = false
@@ -356,6 +359,25 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
     override fun onResume() {
         super.onResume()
         webPlayerMediaSession?.isActive = true
+        syncFollowSystemThemePreference()
+    }
+
+    /**
+     * The "Follow system theme" switch lives in the native settings screen, so the
+     * preference may have changed while this fragment was paused. Re-apply it here:
+     * enabling re-runs the injected theme override, disabling drops the overrides
+     * and reloads so the web app renders with its own theme again.
+     */
+    private fun syncFollowSystemThemePreference() {
+        val followSystem = appPreferences.followSystemTheme
+        val previous = appliedFollowSystemTheme
+        appliedFollowSystemTheme = followSystem
+        // Nothing to do on the first call, or when the value did not change.
+        if (previous == null || previous == followSystem) return
+        webViewBinding?.webView?.evaluateJavascript(
+            if (followSystem) APPLY_SYSTEM_THEME_JS else RESTORE_WEB_THEME_JS,
+            null,
+        )
     }
 
     override fun onPause() {
@@ -554,6 +576,21 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
         private const val MEDIA_BUTTON_REPEAT_INTERVAL_MS = 300L
         private const val WEB_PLAYER_STATE_POLL_INTERVAL_MS = 2000L
         private const val AXIS_THRESHOLD = 0.5f
+
+        /** Re-runs the theme override injected by nativeshell.js. */
+        private const val APPLY_SYSTEM_THEME_JS =
+            "window.applySystemTheme && window.applySystemTheme();"
+
+        /**
+         * Drops the theme overrides written by the injection script and reloads, so
+         * the web app re-renders using its own theme setting again.
+         */
+        private const val RESTORE_WEB_THEME_JS =
+            "try{" +
+                "localStorage.removeItem('appTheme');" +
+                "localStorage.removeItem('dashboardTheme');" +
+                "}catch(e){}" +
+                "location.reload();"
 
         private const val WEB_PLAYER_STATE_QUERY =
             "(function () {" +

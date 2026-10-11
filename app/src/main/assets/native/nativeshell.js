@@ -196,6 +196,14 @@ const applySystemTheme = () => {
 };
 
 applySystemTheme();
+// Exposed so the native settings screen can re-apply the theme right after the
+// user toggles "Follow system theme" (there is no web UI entry point anymore).
+// The appearance overrides must be refreshed too, otherwise turning the switch
+// back on would not update the hard-coded surfaces until the next navigation.
+window.applySystemTheme = () => {
+    applySystemTheme();
+    applyAppearanceOverrides();
+};
 // Apply the theme before the web app renders a new view, so navigation does
 // not flash the dashboard theme before the system theme is re-applied.
 // Capture phase runs before the web app's own viewbeforeshow listeners.
@@ -244,12 +252,20 @@ new MutationObserver(scheduleThemeApply).observe(document.body, {
 // - cards get a soft shadow for separation in both themes
 let appearanceStyleElement = null;
 const applyAppearanceOverrides = () => {
-    const dark = isSystemDark();
     if (!appearanceStyleElement) {
         appearanceStyleElement = document.createElement('style');
         appearanceStyleElement.id = 'nativeAppearanceOverrides';
         document.head.appendChild(appearanceStyleElement);
     }
+    // When "Follow system theme" is off the web app's own theme has to win:
+    // these overrides hard-code a light or dark surface with !important and
+    // would otherwise clash with the selected theme (e.g. light background
+    // with the dark theme's light text).
+    if (!window.NativeInterface.followSystemTheme()) {
+        appearanceStyleElement.textContent = '';
+        return;
+    }
+    const dark = isSystemDark();
     appearanceStyleElement.textContent = dark ? (
         // Global fallback so the page never flashes light while the theme
         // stylesheet is swapped during navigation.
@@ -347,53 +363,8 @@ const applyAppearanceOverrides = () => {
 };
 applyAppearanceOverrides();
 
-// Add a "Follow system" option to the theme selects on the web settings page
-// (user theme #selectTheme and dashboard theme #selectDashboardTheme) and
-// sync the app preference with the selection.
-const THEME_AUTO_VALUE = 'auto';
-const THEME_AUTO_LABEL = 'Follow system (\u8ddf\u968f\u7cfb\u7edf)';
-
-const addAutoThemeOption = (select) => {
-    if (!select.querySelector('option[value="' + THEME_AUTO_VALUE + '"]')) {
-        const option = document.createElement('option');
-        option.value = THEME_AUTO_VALUE;
-        option.textContent = THEME_AUTO_LABEL;
-        select.appendChild(option);
-    }
-};
-
-const syncThemeSelects = () => {
-    const followSystem = window.NativeInterface.followSystemTheme();
-    ['#selectTheme', '#selectDashboardTheme'].forEach((selector) => {
-        const select = document.querySelector(selector);
-        if (!select) return;
-        addAutoThemeOption(select);
-        if (followSystem && select.value !== THEME_AUTO_VALUE) {
-            select.value = THEME_AUTO_VALUE;
-        }
-    });
-};
-
-// Settings views are rendered dynamically, so watch for their appearance.
-let themeSyncScheduled = false;
-const scheduleThemeSync = () => {
-    if (themeSyncScheduled) return;
-    themeSyncScheduled = true;
-    requestAnimationFrame(() => {
-        themeSyncScheduled = false;
-        syncThemeSelects();
-    });
-};
-new MutationObserver(scheduleThemeSync).observe(document.body, { childList: true, subtree: true });
-syncThemeSelects();
-
-document.addEventListener('change', (event) => {
-    const target = event.target;
-    if (!target || (target.id !== 'selectTheme' && target.id !== 'selectDashboardTheme')) return;
-    if (target.value === THEME_AUTO_VALUE) {
-        window.NativeInterface.setFollowSystemTheme(true);
-        applySystemTheme();
-    } else {
-        window.NativeInterface.setFollowSystemTheme(false);
-    }
-});
+// The "Follow system" switch now lives in the native settings screen.
+// The previous DOM injection into the web theme selects was removed: it relied on
+// the #selectTheme / #selectDashboardTheme native <select> elements, which
+// jellyfin-web 12.x replaced with MUI Select components, making every selector
+// miss. Theme following itself is handled by applySystemTheme() above.
