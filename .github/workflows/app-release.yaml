@@ -1,0 +1,66 @@
+name: App / Release build
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build signed libre release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tags are needed to derive the version number
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version-file: .tools-versions
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Determine version from latest tag
+        id: version
+        run: |
+          VER=$(git tag --sort=-v:refname | head -1 | sed 's/^v//')
+          echo "value=$VER" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VER"
+
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::KEYSTORE_B64 secret is not configured (see repo docs)"
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 --decode > "$GITHUB_WORKSPACE/jellyfin-release.jks"
+          test -s "$GITHUB_WORKSPACE/jellyfin-release.jks"
+
+      - name: Assemble libre release
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/jellyfin-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew :app:assembleLibreRelease \
+            -Pjellyfin.version=${{ steps.version.outputs.value }} \
+            --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jellyfin-android-libre-release
+          path: app/build/outputs/apk/libre/release/*.apk
+          retention-days: 30
+          if-no-files-found: error
