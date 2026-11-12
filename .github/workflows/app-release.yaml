@@ -65,10 +65,14 @@ jobs:
       - name: Report build failure
         if: failure()
         run: |
-          echo "## Gradle build failed" >> "$GITHUB_STEP_SUMMARY"
-          echo '```text' >> "$GITHUB_STEP_SUMMARY"
-          tail -100 gradle-build.log >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "## Build failed" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f gradle-build.log ]; then
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -100 gradle-build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No gradle-build.log (failed before the Gradle step)." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
