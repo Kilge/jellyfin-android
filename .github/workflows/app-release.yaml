@@ -17,7 +17,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # tags are needed to derive the version number
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -32,6 +33,10 @@ jobs:
         id: version
         run: |
           VER=$(git tag --sort=-v:refname | head -1 | sed 's/^v//')
+          if [ -z "$VER" ]; then
+            echo "::error::No tags found - cannot determine version"
+            exit 1
+          fi
           echo "value=$VER" >> "$GITHUB_OUTPUT"
           echo "Building version: $VER"
 
@@ -55,7 +60,15 @@ jobs:
         run: |
           ./gradlew :app:assembleLibreRelease \
             -Pjellyfin.version=${{ steps.version.outputs.value }} \
-            --no-daemon
+            --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+
+      - name: Report build failure
+        if: failure()
+        run: |
+          echo "## Gradle build failed" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          tail -100 gradle-build.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
